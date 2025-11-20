@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hava Kalitesi Karar Destek Sistemi</title>
+    <!-- Tailwind CSS ve FontAwesome CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f4f6f9; }
+        .card { 
+            background-color: white; 
+            border-radius: 1rem; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); 
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        /* Tablo Stilleri: Pandaların ürettiği tabloya özel stiller */
+        #sample-data-container table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            font-size: 0.9rem;
+        }
+        #sample-data-container th { 
+            background-color: #dbeafe; /* Mavi/Gri Başlık */
+            padding: 0.75rem; 
+            text-align: left; 
+            font-weight: 600;
+        }
+        #sample-data-container tr:nth-child(even) { 
+            background-color: #f9fafb; 
+        }
+        #sample-data-container td { 
+            padding: 0.75rem; 
+            border-bottom: 1px solid #e5e7eb; 
+        }
+        /* LLM Analiz Metni Stilleri */
+        #analysis-content ul { 
+            list-style: disc; 
+            margin-left: 1.5rem; 
+            padding-left: 0.5rem;
+        }
+        #analysis-content strong { 
+            font-weight: 700; 
+            color: #1e3a8a; /* Koyu Mavi */
+        } 
+        /* LLM'den gelen başlıkları H3 gibi göstermek için */
+        #analysis-content h3 { 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            color: #4f46e5; /* Mor tonu */
+            margin-top: 1.5rem;
+            border-bottom: 2px solid #e0e7ff;
+            padding-bottom: 0.5rem;
+        }
+        .prose > * + * {
+            margin-top: 1em;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Başlık Alanı -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-800 tracking-tight">
+                <i class="fas fa-wind text-blue-600 mr-3"></i>AI Hava Kalitesi Karar Destek Sistemi
+            </h1>
+            <p class="text-lg text-gray-500 mt-2">
+                Derin öğrenme tahminleri ve Gemini ile gerçek zamanlı (Google Search) analiz.
+            </p>
+        </header>
+
+        {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6 card" role="alert">
+            <strong class="font-bold">Sunucu Hatası!</strong>
+            <span class="block sm:inline">{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- Sol Kolon: Kullanıcı Girişi ve Tahmin Metriği -->
+            <div class="lg:col-span-1 space-y-8">
+                
+                <!-- Model Bilgisi ve Giriş Kartı -->
+                <div class="card p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-map-marker-alt text-purple-500 mr-2"></i> Sorgulama Alanı</h2>
+                    
+                    <div class="mb-4">
+                        <label for="city-select" class="block text-sm font-medium text-gray-700 mb-1">Şehir Seçin (Analiz Tipi)</label>
+                        <select id="city-select" onchange="updateModelInfo()" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                            <option value="Beijing">Pekin, Çin (ML Tahmini + Analiz)</option>
+                            <option value="Ankara">Ankara, Türkiye (Gerçek Zamanlı AI Analizi)</option>
+                            <option value="İstanbul">İstanbul, Türkiye (Gerçek Zamanlı AI Analizi)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Metrik ve Model Tipi Bilgisi -->
+                    <div class="space-y-3 mt-4">
+                        <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                            <span class="font-semibold text-gray-700">Model Tipi</span>
+                            <span class="text-blue-700 font-bold" id="model-type-display">Çok Katmanlı GRU</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                            <span class="font-semibold text-gray-700" id="rmse-label">RMSE (Pekin Modeli)</span>
+                            <span id="rmse-output" class="text-red-700 font-bold">23.40 µg/m³</span>
+                        </div>
+                    </div>
+                    
+                    <button id="analyze-button" 
+                            class="mt-6 w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition duration-150 shadow-md flex items-center justify-center disabled:opacity-50"
+                            onclick="analyzePollution()">
+                        <i class="fas fa-brain mr-2"></i> Analizi Başlat
+                    </button>
+                    <p id="loading-message" class="text-sm text-center text-gray-500 mt-2 hidden">
+                        <i class="fas fa-spinner fa-spin mr-1 text-purple-600"></i> Gemini Analisti verileri yorumluyor...
+                    </p>
+                </div>
+
+                <!-- Örnek Veri Tablosu -->
+                <div class="card p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-table text-blue-500 mr-2"></i> Veri Özeti</h2>
+                    <div id="sample-data-container" class="overflow-x-auto">
+                        <p class="text-gray-500">Analizi başlatmak için butona tıklayınız.</p>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Sağ Kolon: Gemini Analiz Sonuçları -->
+            <div class="lg:col-span-2">
+                <div class="card p-8 min-h-full">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-robot text-purple-500 mr-3"></i> Yapay Zeka Analisti Raporu
+                    </h2>
+                    <div id="analysis-content" class="prose max-w-none text-gray-700 leading-relaxed">
+                        <p class="text-lg text-gray-500" id="initial-prompt">
+                            Lütfen soldan bir şehir seçin ve analizi başlatın. Pekin seçildiğinde model tahmini; Ankara/İstanbul seçildiğinde Gemini AI (Google Search ile) gerçek zamanlı analiz yapar.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- JavaScript - Ajax İşlemleri -->
+    <script>
+        // LLM'den gelen metni işleyip HTML formatına çeviren yardımcı fonksiyon
+        function formatLLMOutput(markdownText) {
+            // Başlıkları (1., 2., 3.) h3 etiketlerine dönüştür
+            let htmlText = markdownText.replace(/^(\d+\.\s*[^.\n]+)$/gm, '<h3>$1</h3>');
+            
+            // Madde işaretlerini (*) <ul><li> etiketlerine dönüştür
+            let lines = htmlText.split('\n');
+            let formattedLines = [];
+            let inList = false;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (line.startsWith('*')) {
+                    if (!inList) {
+                        formattedLines.push('<ul>');
+                        inList = true;
+                    }
+                    formattedLines.push('<li>' + line.substring(1).trim() + '</li>');
+                } else {
+                    if (inList) {
+                        formattedLines.push('</ul>');
+                        inList = false;
+                    }
+                    if (line.length > 0 && !line.startsWith('<h3>')) {
+                        formattedLines.push('<p>' + line + '</p>');
+                    } else if (line.startsWith('<h3>')) {
+                        formattedLines.push(line);
+                    }
+                }
+            }
+            if (inList) {
+                formattedLines.push('</ul>');
+            }
+            
+            return formattedLines.join('').replace(/<\/p><ul>/g, '<ul>').replace(/<\/ul><p>/g, '</ul>');
+        }
+
+        function updateModelInfo() {
+            const citySelect = document.getElementById('city-select');
+            const selectedCity = citySelect.value;
+            const rmseOutput = document.getElementById('rmse-output');
+            const rmseLabel = document.getElementById('rmse-label');
+            const modelTypeDisplay = document.getElementById('model-type-display');
+
+            if (selectedCity === 'Beijing') {
+                rmseOutput.textContent = '23.40 µg/m³';
+                rmseLabel.textContent = 'RMSE (Pekin Modeli)';
+                modelTypeDisplay.textContent = 'Çok Katmanlı GRU';
+            } else {
+                rmseOutput.textContent = 'Gerçek Zamanlı (Web Arama)';
+                rmseLabel.textContent = 'Analiz Kaynağı';
+                modelTypeDisplay.textContent = 'Gemini AI + Google Search';
+            }
+        }
+
+        async function analyzePollution() {
+            const button = document.getElementById('analyze-button');
+            const loadingMessage = document.getElementById('loading-message');
+            const analysisContent = document.getElementById('analysis-content');
+            const sampleDataContainer = document.getElementById('sample-data-container');
+            const citySelect = document.getElementById('city-select');
+            const selectedCity = citySelect.value;
+
+            // Durumları sıfırla
+            button.disabled = true;
+            loadingMessage.classList.remove('hidden');
+            analysisContent.innerHTML = `<p class="text-lg text-gray-500"><i class="fas fa-spinner fa-spin mr-1"></i> Analiz için veriler hazırlanıyor ve Gemini AI'ya gönderiliyor...</p>`;
+            sampleDataContainer.innerHTML = `<p class="text-gray-500">Veriler getiriliyor...</p>`;
+
+            try {
+                // Flask Endpoint'a API isteği gönderme (Şehri gönderiyoruz)
+                const response = await fetch('/predict_and_analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ city: selectedCity })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status !== 'error') {
+                    
+                    // 1. Analiz Metnini Görüntüleme ve Formatlama
+                    analysisContent.innerHTML = formatLLMOutput(data.analysis);
+                    
+                    // 2. Örnek Veri Tablosunu Görüntüleme
+                    sampleDataContainer.innerHTML = data.sample_data;
+                    
+                    // 3. Tablo stilini uygula
+                    const table = sampleDataContainer.querySelector('table');
+                    if (table) {
+                        table.classList.add('table-auto', 'w-full', 'rounded-lg', 'text-sm');
+                    }
+
+                } else {
+                    analysisContent.innerHTML = `<p class="text-xl text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i> Analiz başarısız oldu.</p><p class="mt-4 text-gray-700">${data.analysis || 'Bilinmeyen bir hata oluştu. Lütfen sunucu loglarını kontrol edin.'}</p>`;
+                }
+
+            } catch (error) {
+                analysisContent.innerHTML = `<p class="text-xl text-red-600 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i> Ağ Hatası.</p><p class="mt-4 text-gray-700">Sunucuya ulaşılamadı. Hata Detayı: ${error.message}</p>`;
+            } finally {
+                // İşlem bitince buton ve mesajı sıfırla
+                button.disabled = false;
+                loadingMessage.classList.add('hidden');
+            }
+        }
+        
+        // Sayfa yüklendiğinde bir kez çalıştır
+        document.addEventListener('DOMContentLoaded', updateModelInfo);
+    </script>
+</body>
+</html>
