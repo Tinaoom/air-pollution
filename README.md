@@ -7,6 +7,8 @@ ve diğer şehirler (Ankara, İstanbul, İzmir vb.) için Gemini AI üzerinden g
 Uygulama, tamamen interaktif bir web arayüzü (index.html) ile çalışır ve hem ML tahmini hem de LLM destekli analiz üretir.
 
 ## 📁 Proje Yapısı
+
+
 AirApp/
 │
 ├── app.py # Flask API + ML Prediction + Gemini Analysis
