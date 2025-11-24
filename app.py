@@ -31,7 +31,7 @@ encoder = None
 initial_data_scaled = None
 initial_data_raw = None
 
-API_KEY = 'AIzaSyCM1J0bjd8i_RHO1y4ZGDn1N2COAHyVOso'
+API_KEY = 'API KEYİNİZİ GİRİNİZ'
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
 
 # --- 1. VERİ HAZIRLAMA VE ÖN İŞLEME FONKSİYONLARI ---
